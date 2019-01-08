@@ -29,7 +29,7 @@ Public Class clsUdpChannel
         'Console.WriteLine(Buffer)
         _TimeOfLastRx = Now
 
-        ' Pass the data along to specifeid consumer
+        ' Pass the data along to specified consumer
         f.BeginInvoke(Consumer, New Object() {Buffer})
 
         ' Listen for the next data
