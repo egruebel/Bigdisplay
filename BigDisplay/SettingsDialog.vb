@@ -3,7 +3,7 @@
     Private settings As clsSettings
     Private Sub SettingsDialog_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         'callerWindow = CallerWindow
-        settings = callerWindow.settings
+        'settings = callerWindow.settings
         PropertyGrid1.SelectedObject = settings
     End Sub
     Public Property CallerWindow As frmMain 
@@ -14,5 +14,9 @@
     Private Sub btnSaveExit_Click(sender As Object, e As EventArgs) Handles btnSaveExit.Click
         DialogResult = DialogResult.OK
         Me.Close()
+    End Sub
+
+    Public Sub BindSettings(ByRef setObj As clsSettings)
+        settings = setObj
     End Sub
 End Class

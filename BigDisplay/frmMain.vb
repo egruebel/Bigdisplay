@@ -26,6 +26,7 @@ Public Class frmMain
     Private ChanRmyBow As clsData
     Private ChanRad As clsData
     Private ChanAttitude As clsData
+    Private ChanLog As clsData
 
     Private lwLatLon As New ctlLabeledWindow(ctlLabeledWindow.LabelLocations.Top)
     Private lwSog As New ctlLabeledWindow(ctlLabeledWindow.LabelLocations.Top)
@@ -64,7 +65,9 @@ Public Class frmMain
         Me.Text = My.Application.Info.AssemblyName & "  v" & My.Application.Info.Version.ToString
 
         'read settings from xml
-        ReadSettingsFromFile()
+        'settings_copy is for adjusting settings without affecting the live settings
+        settings = ReadSettingsFromFile()
+        settings_copy = settings.Clone()
 
         ' Splitter fills the form, ShipState fills left panel
         scMain.Dock = DockStyle.Fill
@@ -109,10 +112,15 @@ Public Class frmMain
         ChanRmyBow = New clsData("RmyBow", settings.BowMetChannel, AddressOf ParseRmyBow, 5, AddressOf ClearRmyBow) '16011
         ChanRad = New clsData("Rad", settings.RadChannel, AddressOf ParseRad, 5, AddressOf ClearRad) '16012
         ChanAttitude = New clsData("Rad", settings.AttitudeChannel, AddressOf ParseAttitude, 5, AddressOf ClearAttitude) '16012
-
+        ChanLog = New clsData("Log", settings.SpdLogChannel, AddressOf ParseSpeedLog, 5, AddressOf ClearSpeedLog) '16014
 
     End Sub
+    
+
     Public Sub ApplySettings
+
+        settings = settings_copy.Clone()
+
         ' Animation setup
         ss.AnimationFrames = settings.AnimationFrames
         ss.AnimationFrameRate = settings.AnimationFrameRate
@@ -121,6 +129,7 @@ Public Class frmMain
         ss.BackColor = settings.SS_BackColor
         ss.RoseColor = settings.SS_RoseColor
         ss.ShipVectorColor = settings.SS_ShipVectorColor
+        ss.SpeedLogVectorColor = settings.SpdLogVectorColor
         ss.ShipColor = settings.SS_ShipColor
         ss.AttitudeDisplay.RoseColor = settings.AttitudeRoseColor
         ss.AttitudeDisplay.TargetColor = settings.AttitudeTargetColor
@@ -150,6 +159,7 @@ Public Class frmMain
     End Sub
 
     Public Property settings as clsSettings = New clsSettings
+    Private Property settings_copy as clsSettings = New clsSettings
 
     Private Sub CreateWindows()
 
@@ -272,6 +282,31 @@ Public Class frmMain
             lwDepth.Text = SafeFormat(buf(settings.DepthIndex), settings.DepthNumFormat)
         End If
 
+    End Sub
+
+    Private Sub ParseSpeedLog(ByVal s As String)
+        Dim buffer() As String
+        Dim buf() As String
+        Static Data As String
+
+        Data &=s 
+        buffer = ExtractStrings(Data, vbCrLf, 100)
+
+        buf = ParseLatest(buffer, settings.SpdLogQualifier, settings.SpdLogDelimiter)
+
+        If buf.Length >= settings.SpdLogMinLength Then
+            Dim LongSpd As Single = CSng(Val(buf(settings.SpdLogVelocityLongitudinalIndex)))
+            Dim TransSpd As Single = CSng(Val(buf(settings.SpdLogVelocityTransverseIndex)))
+
+            'Get convert to a vector relative to 090 degrees
+            Dim rad As Double = Math.atan2(TransSpd, LongSpd)
+            Dim deg As Double = rad * (180 / Math.PI)
+            'Dim deg As Double = 30.0
+            Dim vel As Double = Math.Sqrt((LongSpd*LongSpd) + (TransSpd*TransSpd))
+            ss.SetSpeedLog(Convert.ToSingle(deg), Convert.ToSingle(vel))
+            ss.SpeedLogVectorVisible = True
+
+        End If
     End Sub
 
     Private Sub ParseWind(ByVal s As String)
@@ -409,8 +444,8 @@ Public Class frmMain
         If buf.Length >= settings.MetMinLength Then
             If settings.MetPriority = MetPriorityEnum.Trans Then
                 lwAirT.Text = SafeFormat(buf(settings.MetIndex_Temp), settings.MetNumFormat_Temp)
-                lwBaro.Text = SafeFormat(buf(settings.BowMetIndex_Baro), settings.MetNumFormat_Baro)
-                lwRHum.Text = SafeFormat(buf(settings.BowMetIndex_Hum), settings.MetNumFormat_Hum)
+                lwBaro.Text = SafeFormat(buf(settings.MetIndex_Baro), settings.MetNumFormat_Baro)
+                lwRHum.Text = SafeFormat(buf(settings.MetIndex_Hum), settings.MetNumFormat_Hum)
             End If
 
             lwWetB.Text = SafeFormat(buf(settings.MetIndex_WetB), settings.MetNumFormat_WetB) '& deg '& dot & StrCtoF(buf(9), 0) & deg
@@ -517,6 +552,8 @@ Public Class frmMain
             ChanMet.Close()
             ChanDepth.Close()
             ChanTsal.Close()
+            ChanRmyBow.Close()
+            ChanLog.Close()
         Catch
         End Try
     End Sub
@@ -563,6 +600,10 @@ Public Class frmMain
         lwQual.Text = ""
     End Sub
 
+    Private Sub ClearSpeedLog()
+        ss.SpeedLogVectorVisible = False
+    End Sub
+
     Private Sub ClearTsal()
         lwSal.Text = ""
         lwFluor.Text = ""
@@ -603,17 +644,20 @@ Public Class frmMain
         'ss.AttitudeVisible = False
     End Sub
 
-    Private Sub ReadSettingsFromFile()
+    Private Function ReadSettingsFromFile() As clsSettings
         Dim serializer As new Xml.Serialization.XmlSerializer(settings.GetType)
         Try
             Using reader As XmlReader = XmlReader.Create("BigDisplay.Settings.xml")
-                settings = CType(serializer.Deserialize(reader), clsSettings)
+                'settings = CType(serializer.Deserialize(reader), clsSettings)
+                return CType(serializer.Deserialize(reader), clsSettings)
             End Using
         Catch ex As Exception
-            settings = New clsSettings()
+            Dim s = New clsSettings()
             SaveSettingsToFile()
+            return s
         End Try
-    End Sub
+    End Function
+
     Private Sub SaveSettingsToFile()
         Dim serializer As new Xml.Serialization.XmlSerializer(settings.GetType)
         Dim writerSettings as new XmlWriterSettings
@@ -625,6 +669,8 @@ Public Class frmMain
 
     Private Sub OptionsToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles OptionsToolStripMenuItem.Click
         Dim settingsDialog as New SettingsDialog
+        settings_copy = ReadSettingsFromFile()
+        settingsDialog.BindSettings(settings_copy)
         settingsDialog.CallerWindow = me
         Dim result = settingsDialog.ShowDialog()
         If(result = DialogResult.OK) Then

@@ -49,6 +49,17 @@ Public Class clsSettings
     Public Property HeadingMinLength As Integer = 2
     Public Property HeadingIndex As Int16 = 1
 
+    Public Property SpdLogChannel As Int16 = 16014
+    Public Property SpdLogQualifier As String = "$VBW"
+    Public Property SpdLogDelimiter As Char = ","c
+    Public Property SpdLogMinLength As Integer = 2
+    Public Property SpdLogVelocityLongitudinalIndex As Int16 = 1
+    Public Property SpdLogVelocityTransverseIndex As Int16 = 2
+    Public Property SpdLogDataValidIndex As Int16 = 3
+
+    Public Property SpdLogVectorColor As Color = Color.Aquamarine
+
+
     Public Property WindChannel As Int16 = 16007
     public Property WindQualifier As String = "$PTRUEWIND"
     Public Property WindDelimiter As Char = ","c
@@ -88,7 +99,7 @@ Public Class clsSettings
     Public Property MetChannel As Int16 = 16006
     public Property MetQualifier As String = "$PMET"
     Public Property MetDelimiter As Char = ","c
-    Public Property MetMinLength As Integer = 25
+    Public Property MetMinLength As Integer = 11
     Public Property MetIndex_Temp As Int16 = 1
     Public Property MetNumFormat_Temp As String = "0.0"
     Public Property MetLabel_Temp As String = "" 
@@ -98,7 +109,7 @@ Public Class clsSettings
     Public Property MetIndex_SST5 As Int16 = 11
     Public Property MetNumFormat_SST5 As String = "0.0"
     Public Property MetLabel_SST5 As String = "Sea Temp 5m (^176^C)"
-    Public Property MetIndex_SST1 As Int16 = 13
+    Public Property MetIndex_SST1 As Int16 = 10
     Public Property MetNumFormat_SST1 As String = "0.0"
     Public Property MetLabel_SST1 As String = "Sea Temp 1m (^176^C)"
     Public Property MetIndex_Baro As Int16 = 5
@@ -175,4 +186,8 @@ Public Class clsSettings
     <XmlElement(GetType(XmlColor))>
     Public Property AttitudeTargetColor As Color = Color.Brown
 
+
+    Public Function Clone() As clsSettings
+        Return DirectCast(Me.MemberwiseClone(), clsSettings)
+    End Function
 End Class

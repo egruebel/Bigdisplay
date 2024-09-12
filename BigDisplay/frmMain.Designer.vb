@@ -51,6 +51,8 @@ Partial Class frmMain
         Me.ss.ShipVectorColor = System.Drawing.Color.Yellow
         Me.ss.ShipVectorScale = 12!
         Me.ss.ShipVectorVisible = true
+        Me.ss.SpeedLogVectorVisible = true
+        Me.ss.SpeedLogChaserSet(0, 2!)
         Me.ss.ShipVisible = true
         Me.ss.Size = New System.Drawing.Size(200, 200)
         Me.ss.TabIndex = 2

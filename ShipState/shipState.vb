@@ -24,6 +24,7 @@ Public Class ShipState
     Private Attitude As New clsAttitudeGauge
     Private Ship As New clsShipQueue
     Private ShipVector As New clsVectorQueue(False)
+    Private SpeedLogVector As New clsVectorQueue(False)
     Private Winds As New Dictionary(Of String, clsVectorQueue)
     Private Frames As Integer = 99
     Private FrameRate As Integer = 7
@@ -45,6 +46,7 @@ Public Class ShipState
         Rose.Draw(g)
         Ship.Draw(g)
         ShipVector.Draw(g)
+        SpeedLogVector.Draw(g)
         Attitude.Draw(g)
         For Each vq As clsVectorQueue In Winds.Values
             vq.Draw(g)
@@ -59,6 +61,10 @@ Public Class ShipState
         ShipVector.BarbLengthRatio = 0.15
         ShipVector.BarbWidthRatio = 0.07
         ShipVector.LineColor = Color.Yellow
+
+        SpeedLogVector.BarbLengthRatio = .15
+        SpeedLogVector.BarbWidthRatio = .07
+        SpeedLogVector.LineColor = Color.DarkRed
 
         Me.lblShipCmg.Text = ""
         Me.lblShipSmg.Text = ""
@@ -113,6 +119,11 @@ Public Class ShipState
         ShipVector.LineWidth = Radius * 0.029!
         ShipVector.ScaleFactor = Diameter / _ShipVectorScale   ' The speed indicated by a vector, length = rose diameter
         ShipVector.Update()
+
+        SpeedLogVector.Origin = Origin
+        SpeedLogVector.LineWidth = Radius * 0.029!
+        SpeedLogVector.ScaleFactor = Diameter / _ShipVectorScale   ' The speed indicated by a vector, length = rose diameter
+        SpeedLogVector.Update()
 
         For Each vq As clsVectorQueue In Winds.Values
             vq.Origin = Origin
@@ -392,6 +403,69 @@ Public Class ShipState
     End Sub
     <Browsable(True), _
         Description("The course and speed over ground the ship vector is to represent.")> _
+    Public Sub SetSpeedLog(ByVal angle As Single, ByVal velocity As Single)
+        If Not SpeedLogVector.Task Is Nothing Then
+            If (Not SpeedLogVector.Task.IsCompleted) Or (Not SpeedLogVector.Task.IsCanceled ) Then
+                Try
+                    SpeedLogVector.CancellationTokenSource.Cancel
+                    SpeedLogVector.Task.Wait
+                Catch ex As Exception
+                Finally
+                    SpeedLogVector.CancellationTokenSource = New CancellationTokenSource()
+                    SpeedLogVector.CancellationToken = SpeedLogVector.CancellationTokenSource.Token
+
+                End Try
+            End If
+        End If
+        SpeedLogVector.Task = Task.Run(Sub()
+            dim capturedToken as CancellationToken = SpeedLogVector.CancellationToken
+            Dim sw as new Stopwatch 
+            sw.Start 
+            'get the ship's heading
+            Dim shipOrientation As clsShip = Ship.GetLast
+            Dim head As Single = 0
+            If(Not shipOrientation Is Nothing) Then
+                head = shipOrientation.Heading
+            End If
+            angle = head + angle
+            If (angle < 0.0) Then
+                angle = angle + 360
+
+            End If
+            If (angle > 360.0) Then
+                angle = angle - 360
+            End If
+
+
+            Dim last As clsVector = SpeedLogVector.GetLast
+            Dim lastAngle as Single = 0
+            Dim lastVelocity as Single = 0
+            If(Not last Is Nothing) Then
+                lastAngle = last.Direction
+                lastVelocity = last.Magnitude
+            End If
+            Dim angleDif = SignedAngularDifference(lastAngle, angle)
+            Dim velocityDif = velocity - lastVelocity
+            Dim cAngle, cVelocity As Single
+            
+            for i As Integer = 0 to Frames
+                If(capturedToken.IsCancellationRequested)
+                    Exit For
+                End If
+                cAngle = EaseCubic(i,lastAngle, angleDif,Frames)
+                cVelocity = EaseCubic(i,lastVelocity, velocityDif,Frames)
+                SpeedLogVector.add(cAngle, cVelocity, cVelocity / 2.0!)
+                capturedToken.WaitHandle.WaitOne(FrameRate)
+            Next
+            Debug.Print("SpeedLogExecTime" & sw.ElapsedMilliseconds)
+        End Sub, SpeedLogVector.CancellationToken)
+        'lblShipCmg.Text = Format(cog, "000") & deg
+        'lblShipSmg.Text = sog.ToString & " kts."
+
+    End Sub
+    
+    <Browsable(True), _
+        Description("The course and speed over ground the ship vector is to represent.")> _
     Public Sub SetCogSog(ByVal cog As Single, ByVal sog As Single)
         If Not ShipVector.Task Is Nothing Then
             If (not ShipVector.Task.IsCompleted) or (not ShipVector.Task.IsCanceled) Then
@@ -530,7 +604,18 @@ Public Class ShipState
             lblShipSmg.Visible = value
         End Set
     End Property
-
+    
+    <Browsable(True), _
+    Description("Deternins if the ship vector and CMG and SMG values are visible or hidden.")> _
+    Public Property SpeedLogVectorVisible() As Boolean
+        Get
+            Return SpeedLogVector.Visible
+        End Get
+        Set(ByVal value As Boolean)
+            SpeedLogVector.Visible = value
+        End Set
+    End Property
+    
     <Browsable(True), _
    Description("The color of the ship vector representing CMG and SMG.")> _
     Public Property ShipVectorColor() As Color
@@ -541,6 +626,19 @@ Public Class ShipState
             ShipVector.LineColor = value
         End Set
     End Property
+    Public Property SpeedLogVectorColor() As Color
+        Get
+            Return SpeedLogVector.LineColor
+        End Get
+        Set(ByVal value As Color)
+            SpeedLogVector.LineColor = value
+        End Set
+    End Property
+
+    Public sub SpeedLogChaserSet(byval count As Integer, byval fadefactor As single)
+        SpeedLogVector.MaxCount = 1
+        SpeedLogVector.FadeFactor = fadefactor
+    End sub
 
     Public Property ShipVectorChaserCount() As Integer
         'Chaser count is in addition to the vector itself
